@@ -5,7 +5,7 @@ import (
 	"github.com/e421083458/go_gateway/dto"
 	"github.com/e421083458/go_gateway/middleware"
 	"github.com/e421083458/go_gateway/public"
-	"github.com/e421083458/golang_common/lib"
+	"github.com/e421083458/go_gateway/golang_common/lib"
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
 	"time"
@@ -28,7 +28,7 @@ type APPController struct {
 // APPList godoc
 // @Summary 租户列表
 // @Description 租户列表
-// @Tags 租户管理接口
+// @Tags 租户管理
 // @ID /app/app_list
 // @Accept  json
 // @Produce  json
@@ -52,9 +52,12 @@ func (admin *APPController) APPList(c *gin.Context) {
 
 	outputList := []dto.APPListItemOutput{}
 	for _, item := range list {
-		serviceCounter, _ := public.FlowCounterHandler.GetCounter(public.FlowAPPPrefix + item.AppID)
-		realQps := serviceCounter.GetQPS()
-		realQpd, _ := serviceCounter.GetDayCount(time.Now())
+		appCounter, err := public.FlowCounterHandler.GetCounter(public.FlowAppPrefix + item.AppID)
+		if err != nil {
+			middleware.ResponseError(c, 2003, err)
+			c.Abort()
+			return
+		}
 		outputList = append(outputList, dto.APPListItemOutput{
 			ID:       item.ID,
 			AppID:    item.AppID,
@@ -63,8 +66,8 @@ func (admin *APPController) APPList(c *gin.Context) {
 			WhiteIPS: item.WhiteIPS,
 			Qpd:      item.Qpd,
 			Qps:      item.Qps,
-			RealQpd:  realQpd,
-			RealQps:  realQps,
+			RealQpd:  appCounter.TotalCount,
+			RealQps:  appCounter.QPS,
 		})
 	}
 	output := dto.APPListOutput{
@@ -78,7 +81,7 @@ func (admin *APPController) APPList(c *gin.Context) {
 // APPDetail godoc
 // @Summary 租户详情
 // @Description 租户详情
-// @Tags 租户管理接口
+// @Tags 租户管理
 // @ID /app/app_detail
 // @Accept  json
 // @Produce  json
@@ -106,7 +109,7 @@ func (admin *APPController) APPDetail(c *gin.Context) {
 // APPDelete godoc
 // @Summary 租户删除
 // @Description 租户删除
-// @Tags 租户管理接口
+// @Tags 租户管理
 // @ID /app/app_delete
 // @Accept  json
 // @Produce  json
@@ -139,7 +142,7 @@ func (admin *APPController) APPDelete(c *gin.Context) {
 // AppAdd godoc
 // @Summary 租户添加
 // @Description 租户添加
-// @Tags 租户管理接口
+// @Tags 租户管理
 // @ID /app/app_add
 // @Accept  json
 // @Produce  json
@@ -153,7 +156,7 @@ func (admin *APPController) AppAdd(c *gin.Context) {
 		return
 	}
 
-	//验证service_name是否被占用
+	//验证app_id是否被占用
 	search := &dao.App{
 		AppID: params.AppID,
 	}
@@ -184,7 +187,7 @@ func (admin *APPController) AppAdd(c *gin.Context) {
 // AppUpdate godoc
 // @Summary 租户更新
 // @Description 租户更新
-// @Tags 租户管理接口
+// @Tags 租户管理
 // @ID /app/app_update
 // @Accept  json
 // @Produce  json
@@ -224,7 +227,7 @@ func (admin *APPController) AppUpdate(c *gin.Context) {
 // AppStatistics godoc
 // @Summary 租户统计
 // @Description 租户统计
-// @Tags 租户管理接口
+// @Tags 租户管理
 // @ID /app/app_stat
 // @Accept  json
 // @Produce  json
@@ -247,64 +250,29 @@ func (admin *APPController) AppStatistics(c *gin.Context) {
 		return
 	}
 
-	counter, _ := public.FlowCounterHandler.GetCounter(public.FlowAPPPrefix + detail.AppID)
-
 	//今日流量全天小时级访问统计
 	todayStat := []int64{}
+	counter, err := public.FlowCounterHandler.GetCounter(public.FlowAppPrefix + detail.AppID)
+	if err != nil {
+		middleware.ResponseError(c, 2002, err)
+		c.Abort()
+		return
+	}
+	currentTime:= time.Now()
 	for i := 0; i <= time.Now().In(lib.TimeLocation).Hour(); i++ {
-		nowTime := time.Now()
-		nowTime = time.Date(nowTime.Year(), nowTime.Month(), nowTime.Day(), i, 0, 0, 0, lib.TimeLocation)
-		hourStat, _ := counter.GetHourCount(nowTime)
-		todayStat = append(todayStat, hourStat)
+		dateTime:=time.Date(currentTime.Year(),currentTime.Month(),currentTime.Day(),i,0,0,0,lib.TimeLocation)
+		hourData,_:=counter.GetHourData(dateTime)
+		todayStat = append(todayStat, hourData)
 	}
 
 	//昨日流量全天小时级访问统计
 	yesterdayStat := []int64{}
+	yesterTime:= currentTime.Add(-1*time.Duration(time.Hour*24))
 	for i := 0; i <= 23; i++ {
-		nowTime := time.Now().AddDate(0, 0, -1)
-		nowTime = time.Date(nowTime.Year(), nowTime.Month(), nowTime.Day(), i, 0, 0, 0, lib.TimeLocation)
-		hourStat, _ := counter.GetHourCount(nowTime)
-		yesterdayStat = append(yesterdayStat, hourStat)
+		dateTime:=time.Date(yesterTime.Year(),yesterTime.Month(),yesterTime.Day(),i,0,0,0,lib.TimeLocation)
+		hourData,_:=counter.GetHourData(dateTime)
+		yesterdayStat = append(yesterdayStat, hourData)
 	}
-	//yesterdayStat = []int64{
-	//	12,
-	//	20,
-	//	23,
-	//	57,
-	//	25,
-	//	48,
-	//	76,
-	//	69,
-	//	140,
-	//	200,
-	//	250,
-	//	345,
-	//	500,
-	//	550,
-	//	780,
-	//	670,
-	//	650,
-	//	500,
-	//	488,
-	//	480,
-	//	440,
-	//	360,
-	//	200,
-	//	105,
-	//}
-	//todayStat = []int64{
-	//	5,
-	//	10,
-	//	20,
-	//	48,
-	//	50,
-	//	55,
-	//	60,
-	//	80,
-	//	100,
-	//	180,
-	//	200,
-	//}
 	stat := dto.StatisticsOutput{
 		Today:     todayStat,
 		Yesterday: yesterdayStat,

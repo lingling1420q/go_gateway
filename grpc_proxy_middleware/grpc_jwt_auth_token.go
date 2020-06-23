@@ -10,35 +10,41 @@ import (
 	"strings"
 )
 
-func GrpcJwtAuthTokenMiddleware(serviceDetail *dao.ServiceDetail) func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
-	return func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
-		md, _ := metadata.FromIncomingContext(ss.Context())
-		tokens := md.Get("Authorization")
-		token := ""
-		if len(tokens) > 0 {
-			token = strings.Replace(tokens[0], "Bearer ", "", -1)
+//jwt auth token
+func GrpcJwtAuthTokenMiddleware(serviceDetail *dao.ServiceDetail) func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error{
+	return func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error{
+		md, ok := metadata.FromIncomingContext(ss.Context())
+		if !ok {
+			return errors.New("miss metadata from context")
 		}
-		appMatched := false
-		if token != "" {
-			claim, err := public.JwtDecode(token)
-			if err == nil {
-				appList := dao.AppHandler.GetAppList()
-				for _, app := range appList {
-					if app.AppID == claim.Issuer {
-						md.Set("app_detail", public.Obj2Json(app))
-						appMatched = true
-						break
-					}
+		authToken:=""
+		auths:=md.Get("authorization")
+		if len(auths)>0{
+			authToken = auths[0]
+		}
+		token:=strings.ReplaceAll(authToken,"Bearer ","")
+		appMatched:=false
+		if token!=""{
+			claims,err:=public.JwtDecode(token)
+			if err!=nil{
+				return errors.WithMessage(err,"JwtDecode")
+			}
+			appList:=dao.AppManagerHandler.GetAppList()
+			for _,appInfo:=range appList{
+				if appInfo.AppID==claims.Issuer{
+					md.Set("app",public.Obj2Json(appInfo))
+					appMatched = true
+					break
 				}
 			}
 		}
-		if serviceDetail.AccessControl.OpenAuth == 1 && !appMatched {
-			return errors.New("HttpJwtAuthTokenMiddleware token error")
+		if serviceDetail.AccessControl.OpenAuth==1 && !appMatched{
+			return errors.New("not match valid app")
 		}
-		err := handler(srv, ss)
-		if err != nil {
-			log.Printf("RPC failed with error %v\n", err)
+		if err := handler(srv, ss);err != nil {
+			log.Printf("GrpcJwtAuthTokenMiddleware failed with error %v\n", err)
+			return err
 		}
-		return err
+		return nil
 	}
 }

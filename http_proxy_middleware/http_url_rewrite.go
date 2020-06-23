@@ -1,7 +1,6 @@
 package http_proxy_middleware
 
 import (
-	"fmt"
 	"github.com/e421083458/go_gateway/dao"
 	"github.com/e421083458/go_gateway/middleware"
 	"github.com/gin-gonic/gin"
@@ -10,32 +9,32 @@ import (
 	"strings"
 )
 
-func HttpUrlRewriteMiddleware() gin.HandlerFunc {
+//匹配接入方式 基于请求信息
+func HTTPUrlRewriteMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		tmp, ok := c.Get("service_detail")
+		serverInterface, ok := c.Get("service")
 		if !ok {
-			middleware.ResponseError(c, 1001, errors.New("HttpUrlRewriteMiddleware get service_detail error"))
+			middleware.ResponseError(c, 2001, errors.New("service not found"))
 			c.Abort()
 			return
 		}
-
-		serviceDetail := tmp.(*dao.ServiceDetail)
-		fmt.Println("before rewrite", c.Request.URL.Path)
-		rewriteRule := strings.Split(serviceDetail.HttpRule.UrlRewrite, ",")
-		if len(rewriteRule) > 0 && serviceDetail.HttpRule.UrlRewrite != "" {
-			for _, rewrite := range rewriteRule {
-				rewriteRule := strings.Split(rewrite, " ")
-				regexp, err := regexp.Compile(rewriteRule[0])
-				if err != nil {
-					middleware.ResponseError(c, 1002, errors.WithMessage(err, "HttpUrlRewriteMiddleware rewriteRules  error"))
-					c.Abort()
-					return
-				}
-				rep := regexp.ReplaceAllString(c.Request.URL.Path, rewriteRule[1])
-				c.Request.URL.Path = rep
+		serviceDetail := serverInterface.(*dao.ServiceDetail)
+		for _,item:=range strings.Split(serviceDetail.HTTPRule.UrlRewrite,","){
+			//fmt.Println("item rewrite",item)
+			items:=strings.Split(item," ")
+			if len(items)!=2{
+				continue
 			}
+			regexp,err:=regexp.Compile(items[0])
+			if err!=nil{
+				//fmt.Println("regexp.Compile err",err)
+				continue
+			}
+			//fmt.Println("before rewrite",c.Request.URL.Path)
+			replacePath:=regexp.ReplaceAll([]byte(c.Request.URL.Path),[]byte(items[1]))
+			c.Request.URL.Path = string(replacePath)
+			//fmt.Println("after rewrite",c.Request.URL.Path)
 		}
-		fmt.Println("after rewrite", c.Request.URL.Path)
 		c.Next()
 	}
 }

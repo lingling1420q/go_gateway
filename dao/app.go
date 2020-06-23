@@ -3,7 +3,7 @@ package dao
 import (
 	"github.com/e421083458/go_gateway/dto"
 	"github.com/e421083458/go_gateway/public"
-	"github.com/e421083458/golang_common/lib"
+	"github.com/e421083458/go_gateway/golang_common/lib"
 	"github.com/e421083458/gorm"
 	"github.com/gin-gonic/gin"
 	"net/http/httptest"
@@ -66,51 +66,56 @@ func (t *App) APPList(c *gin.Context, tx *gorm.DB, params *dto.APPListInput) ([]
 	return list, count, nil
 }
 
-var AppHandler *AppManager
-
-type AppManager struct {
-	appMap     map[string]*App
-	appSlice   []*App
-	appMapLock sync.RWMutex
-	init       sync.Once
-	err        error
-}
+var AppManagerHandler *AppManager
 
 func init() {
-	AppHandler = NewAppManager()
+	AppManagerHandler = NewAppManager()
+}
+
+type AppManager struct {
+	AppMap   map[string]*App
+	AppSlice []*App
+	Locker   sync.RWMutex
+	init     sync.Once
+	err      error
 }
 
 func NewAppManager() *AppManager {
 	return &AppManager{
-		appMap:     make(map[string]*App),
-		appSlice:   []*App{},
-		appMapLock: sync.RWMutex{},
+		AppMap:   map[string]*App{},
+		AppSlice: []*App{},
+		Locker:   sync.RWMutex{},
+		init:     sync.Once{},
 	}
 }
 
+
 func (s *AppManager) GetAppList() []*App {
-	return s.appSlice
+	return s.AppSlice
 }
 
 func (s *AppManager) LoadOnce() error {
 	s.init.Do(func() {
-		model := App{}
+		appInfo := &App{}
 		c, _ := gin.CreateTestContext(httptest.NewRecorder())
-		c.Set("trace", lib.NewTrace())
-		params := &dto.APPListInput{PageSize: 99999, PageNo: 1}
-		list, _, err := model.APPList(c, lib.GORMDefaultPool, params)
+		tx, err := lib.GetGormPool("default")
 		if err != nil {
 			s.err = err
 			return
 		}
-		s.appMapLock.Lock()
-		defer s.appMapLock.Unlock()
-		for _, item := range list {
-			tmp:=item
-			s.appMap[item.AppID] = &tmp
-			s.appSlice = append(s.appSlice, &tmp)
+		params := &dto.APPListInput{PageNo: 1, PageSize: 99999}
+		list, _, err := appInfo.APPList(c, tx, params)
+		if err != nil {
+			s.err = err
+			return
 		}
-		return
+		s.Locker.Lock()
+		defer s.Locker.Unlock()
+		for _, listItem := range list {
+			tmpItem := listItem
+			s.AppMap[listItem.AppID] = &tmpItem
+			s.AppSlice = append(s.AppSlice, &tmpItem)
+		}
 	})
 	return s.err
 }

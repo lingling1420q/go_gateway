@@ -1,7 +1,6 @@
 package http_proxy_middleware
 
 import (
-	"fmt"
 	"github.com/e421083458/go_gateway/dao"
 	"github.com/e421083458/go_gateway/middleware"
 	"github.com/gin-gonic/gin"
@@ -9,28 +8,28 @@ import (
 	"strings"
 )
 
-func HttpHeaderTransferMiddleware() gin.HandlerFunc {
+//匹配接入方式 基于请求信息
+func HTTPHeaderTransferMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		tmp, ok := c.Get("service_detail")
+		serverInterface, ok := c.Get("service")
 		if !ok {
-			middleware.ResponseError(c, 1001, errors.New("HttpReverseProxyMiddleware get service_detail error"))
+			middleware.ResponseError(c, 2001, errors.New("service not found"))
 			c.Abort()
 			return
 		}
-
-		serviceDetail := tmp.(*dao.ServiceDetail)
-		headerTrans := strings.Split(serviceDetail.HttpRule.HeaderTransfor, ",")
-		fmt.Println("c.header before", c.Request.Header)
-		for _, trans := range headerTrans {
-			infos := strings.Split(trans, " ")
-			if infos[0] == "add" || infos[0] == "edit" {
-				c.Request.Header.Set(infos[1], infos[2])
+		serviceDetail := serverInterface.(*dao.ServiceDetail)
+		for _,item:=range strings.Split(serviceDetail.HTTPRule.HeaderTransfor,","){
+			items:=strings.Split(item," ")
+			if len(items)!=3{
+				continue
 			}
-			if infos[0] == "del" {
-				c.Request.Header.Del(infos[1])
+			if items[0]=="add" || items[0]=="edit"{
+				c.Request.Header.Set(items[1],items[2])
+			}
+			if items[0]=="del"{
+				c.Request.Header.Del(items[1])
 			}
 		}
-		fmt.Println("c.header after", c.Request.Header)
 		c.Next()
 	}
 }

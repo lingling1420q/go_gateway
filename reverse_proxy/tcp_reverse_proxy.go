@@ -2,7 +2,7 @@ package reverse_proxy
 
 import (
 	"context"
-	"github.com/e421083458/go_gateway/load_balance"
+	"github.com/e421083458/go_gateway/reverse_proxy/load_balance"
 	"github.com/e421083458/go_gateway/tcp_proxy_middleware"
 	"io"
 	"log"
@@ -14,7 +14,7 @@ func NewTcpLoadBalanceReverseProxy(c *tcp_proxy_middleware.TcpSliceRouterContext
 	return func() *TcpReverseProxy {
 		nextAddr, err := lb.Get("")
 		if err != nil {
-			log.Fatal("tcp proxy get next addr fail")
+			log.Fatal("get next addr fail")
 		}
 		return &TcpReverseProxy{
 			ctx:             c.Ctx,

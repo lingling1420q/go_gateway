@@ -4,12 +4,12 @@ import (
 	"github.com/e421083458/go_gateway/controller"
 	"github.com/e421083458/go_gateway/docs"
 	"github.com/e421083458/go_gateway/middleware"
-	"github.com/e421083458/golang_common/lib"
-	"github.com/gin-contrib/sessions"
-	"github.com/gin-contrib/sessions/redis"
+	"github.com/e421083458/go_gateway/golang_common/lib"
+	"github.com/gin-gonic/contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"github.com/swaggo/files"
 	"github.com/swaggo/gin-swagger"
+	"log"
 )
 
 // @title Swagger Example API
@@ -68,70 +68,72 @@ func InitRouter(middlewares ...gin.HandlerFunc) *gin.Engine {
 
 	router := gin.Default()
 	router.Use(middlewares...)
-
+	router.GET("/ping", func(c *gin.Context) {
+		c.JSON(200, gin.H{
+			"message": "pong",
+		})
+	})
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
-	//设置cookie存储
-	//https://github.com/gin-contrib/sessions
-	store, _ := redis.NewStore(10, "tcp", lib.GetStringConf("redis_map.session.server"), "", []byte("secret"))
-	store.Options(sessions.Options{
-		Path:     "/",
-		MaxAge:   86400,
-		HttpOnly: true,
-	})
-
-	//admin_login
-	adminLogin := router.Group("/admin_login")
-	adminLogin.Use(
+	adminLoginRouter := router.Group("/admin_login")
+	store, err := sessions.NewRedisStore(10, "tcp", lib.GetStringConf("base.session.redis_server"), lib.GetStringConf("base.session.redis_password"), []byte("secret"))
+	if err != nil {
+		log.Fatalf("sessions.NewRedisStore err:%v", err)
+	}
+	adminLoginRouter.Use(
 		sessions.Sessions("mysession", store),
-		middleware.TranslationMiddleware(),
-	)
+		middleware.RecoveryMiddleware(),
+		middleware.RequestLog(),
+		middleware.TranslationMiddleware())
 	{
-		controller.AdminLoginRegister(adminLogin)
+		controller.AdminLoginRegister(adminLoginRouter)
 	}
 
-	//admin
-	admin := router.Group("/admin")
-	admin.Use(
-		middleware.TranslationMiddleware(),
+	adminRouter := router.Group("/admin")
+	adminRouter.Use(
 		sessions.Sessions("mysession", store),
-		middleware.AdminSessionAuthMiddleware(),
-	)
+		middleware.RecoveryMiddleware(),
+		middleware.RequestLog(),
+		middleware.SessionAuthMiddleware(),
+		middleware.TranslationMiddleware())
 	{
-		controller.AdminRegister(admin)
+		controller.AdminRegister(adminRouter)
 	}
 
-	//service
-	service := router.Group("/service")
-	service.Use(
-		middleware.TranslationMiddleware(),
+	serviceRouter := router.Group("/service")
+	serviceRouter.Use(
 		sessions.Sessions("mysession", store),
-		middleware.AdminSessionAuthMiddleware(),
-	)
+		middleware.RecoveryMiddleware(),
+		middleware.RequestLog(),
+		middleware.SessionAuthMiddleware(),
+		middleware.TranslationMiddleware())
 	{
-		controller.ServiceRegister(service)
+		controller.ServiceRegister(serviceRouter)
 	}
 
-	//app
-	app := router.Group("/app")
-	app.Use(
-		middleware.TranslationMiddleware(),
+	appRouter := router.Group("/app")
+	appRouter.Use(
 		sessions.Sessions("mysession", store),
-		middleware.AdminSessionAuthMiddleware(),
-	)
+		middleware.RecoveryMiddleware(),
+		middleware.RequestLog(),
+		middleware.SessionAuthMiddleware(),
+		middleware.TranslationMiddleware())
 	{
-		controller.APPRegister(app)
+		controller.APPRegister(appRouter)
 	}
 
-	//app
-	dash := router.Group("/dashboard")
-	dash.Use(
-		middleware.TranslationMiddleware(),
+
+	dashRouter := router.Group("/dashboard")
+	dashRouter.Use(
 		sessions.Sessions("mysession", store),
-		middleware.AdminSessionAuthMiddleware(),
-	)
+		middleware.RecoveryMiddleware(),
+		middleware.RequestLog(),
+		middleware.SessionAuthMiddleware(),
+		middleware.TranslationMiddleware())
 	{
-		controller.DashBoardRegister(dash)
+		controller.DashboardRegister(dashRouter)
 	}
+
+	router.Static("/dist", "./dist")
 	return router
 }

@@ -3,7 +3,7 @@ package middleware
 import (
 	"bytes"
 	"github.com/e421083458/go_gateway/public"
-	"github.com/e421083458/golang_common/lib"
+	"github.com/e421083458/go_gateway/golang_common/lib"
 	"github.com/gin-gonic/gin"
 	"io/ioutil"
 	"time"
@@ -54,8 +54,12 @@ func RequestOutLog(c *gin.Context) {
 
 func RequestLog() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		RequestInLog(c)
-		defer RequestOutLog(c)
+		//todo 优化点4
+		if lib.GetBoolConf("base.log.file_writer.on") {
+
+			RequestInLog(c)
+			defer RequestOutLog(c)
+		}
 		c.Next()
 	}
 }

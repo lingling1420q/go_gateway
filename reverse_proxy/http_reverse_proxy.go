@@ -1,43 +1,31 @@
 package reverse_proxy
 
 import (
-	"bytes"
-	"compress/gzip"
-	"fmt"
+	"github.com/e421083458/go_gateway/middleware"
+	"github.com/e421083458/go_gateway/reverse_proxy/load_balance"
 	"github.com/gin-gonic/gin"
-	"io/ioutil"
-	"math/rand"
-	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
-	"strconv"
 	"strings"
-	"time"
 )
 
-var transport = &http.Transport{
-	DialContext: (&net.Dialer{
-		Timeout:   30 * time.Second, //连接超时
-		KeepAlive: 30 * time.Second, //长连接超时时间
-	}).DialContext,
-	MaxIdleConns:          100,              //最大空闲连接
-	IdleConnTimeout:       90 * time.Second, //空闲超时时间
-	TLSHandshakeTimeout:   10 * time.Second, //tls握手超时时间
-	ExpectContinueTimeout: 1 * time.Second,  //100-continue超时时间
-}
-
-func NewMultipleHostsReverseProxy(c *gin.Context, targets []*url.URL) *httputil.ReverseProxy {
+func NewLoadBalanceReverseProxy(c *gin.Context, lb load_balance.LoadBalance, trans *http.Transport) *httputil.ReverseProxy {
 	//请求协调者
 	director := func(req *http.Request) {
-		targetIndex := rand.Intn(len(targets))
-		target := targets[targetIndex]
+		nextAddr, err := lb.Get(req.URL.String())
+		//todo 优化点3
+		if err != nil || nextAddr=="" {
+			panic("get next addr fail")
+		}
+		target, err := url.Parse(nextAddr)
+		if err != nil {
+			panic(err)
+		}
 		targetQuery := target.RawQuery
-
 		req.URL.Scheme = target.Scheme
 		req.URL.Host = target.Host
 		req.URL.Path = singleJoiningSlash(target.Path, req.URL.Path)
-		//todo 当对域名(非内网)反向代理时需要设置此项, 当作后端反向代理时不需要
 		req.Host = target.Host
 		if targetQuery == "" || req.URL.RawQuery == "" {
 			req.URL.RawQuery = targetQuery + req.URL.RawQuery
@@ -51,53 +39,42 @@ func NewMultipleHostsReverseProxy(c *gin.Context, targets []*url.URL) *httputil.
 
 	//更改内容
 	modifyFunc := func(resp *http.Response) error {
-		//todo 部分章节功能补充2
-		//todo 兼容websocket
 		if strings.Contains(resp.Header.Get("Connection"), "Upgrade") {
 			return nil
 		}
-		var payload []byte
-		var readErr error
 
-		//todo 部分章节功能补充3
-		//todo 兼容gzip压缩
-		if strings.Contains(resp.Header.Get("Content-Encoding"), "gzip") {
-			gr, err := gzip.NewReader(resp.Body)
-			if err != nil {
-				return err
-			}
-			payload, readErr = ioutil.ReadAll(gr)
-			resp.Header.Del("Content-Encoding")
-		} else {
-			payload, readErr = ioutil.ReadAll(resp.Body)
-		}
-		if readErr != nil {
-			return readErr
-		}
-
-		//异常请求时设置StatusCode
-		if resp.StatusCode != 200 {
-			payload = []byte("StatusCode error:" + string(payload))
-		}
-
-		//todo 部分章节功能补充4
-		//todo 因为预读了数据所以内容重新回写
-		c.Set("status_code", resp.StatusCode)
-		c.Set("payload", payload)
-		resp.Body = ioutil.NopCloser(bytes.NewBuffer(payload))
-		resp.ContentLength = int64(len(payload))
-		resp.Header.Set("Content-Length", strconv.FormatInt(int64(len(payload)), 10))
+		//todo 优化点2
+		//var payload []byte
+		//var readErr error
+		//
+		//if strings.Contains(resp.Header.Get("Content-Encoding"), "gzip") {
+		//	gr, err := gzip.NewReader(resp.Body)
+		//	if err != nil {
+		//		return err
+		//	}
+		//	payload, readErr = ioutil.ReadAll(gr)
+		//	resp.Header.Del("Content-Encoding")
+		//} else {
+		//	payload, readErr = ioutil.ReadAll(resp.Body)
+		//}
+		//if readErr != nil {
+		//	return readErr
+		//}
+		//
+		//c.Set("status_code", resp.StatusCode)
+		//c.Set("payload", payload)
+		//resp.Body = ioutil.NopCloser(bytes.NewBuffer(payload))
+		//resp.ContentLength = int64(len(payload))
+		//resp.Header.Set("Content-Length", strconv.FormatInt(int64(len(payload)), 10))
 		return nil
 	}
 
 	//错误回调 ：关闭real_server时测试，错误回调
 	//范围：transport.RoundTrip发生的错误、以及ModifyResponse发生的错误
 	errFunc := func(w http.ResponseWriter, r *http.Request, err error) {
-		//todo record error log
-		fmt.Println(err)
+		middleware.ResponseError(c,999,err)
 	}
-
-	return &httputil.ReverseProxy{Director: director, Transport: transport, ModifyResponse: modifyFunc, ErrorHandler: errFunc}
+	return &httputil.ReverseProxy{Director: director, ModifyResponse: modifyFunc, ErrorHandler: errFunc}
 }
 
 func singleJoiningSlash(a, b string) string {

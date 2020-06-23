@@ -9,33 +9,43 @@ import (
 	"strings"
 )
 
-func HttpJwtAuthTokenMiddleware() gin.HandlerFunc {
+//jwt auth token
+func HTTPJwtAuthTokenMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		tmp, ok := c.Get("service_detail")
+		serverInterface, ok := c.Get("service")
 		if !ok {
-			middleware.ResponseError(c, 1001, errors.New("HttpJwtAuthTokenMiddleware get service_detail error"))
+			middleware.ResponseError(c, 2001, errors.New("service not found"))
 			c.Abort()
 			return
 		}
-		serviceDetail := tmp.(*dao.ServiceDetail)
+		serviceDetail := serverInterface.(*dao.ServiceDetail)
 
-		token := strings.Replace(c.GetHeader("Authorization"), "Bearer ", "", -1)
-		appMatched := false
-		if token != "" {
-			claim, err := public.JwtDecode(token)
-			if err == nil {
-				appList := dao.AppHandler.GetAppList()
-				for _, app := range appList {
-					if app.AppID == claim.Issuer {
-						c.Set("app_detail", app)
-						appMatched = true
-						break
-					}
+		//fmt.Println("serviceDetail",serviceDetail)
+		// decode jwt token
+		// app_id 与  app_list 取得 appInfo
+		// appInfo 放到 gin.context
+		token:=strings.ReplaceAll(c.GetHeader("Authorization"),"Bearer ","")
+		//fmt.Println("token",token)
+		appMatched:=false
+		if token!=""{
+			claims,err:=public.JwtDecode(token)
+			if err!=nil{
+				middleware.ResponseError(c, 2002, err)
+				c.Abort()
+				return
+			}
+			//fmt.Println("claims.Issuer",claims.Issuer)
+			appList:=dao.AppManagerHandler.GetAppList()
+			for _,appInfo:=range appList{
+				if appInfo.AppID==claims.Issuer{
+					c.Set("app",appInfo)
+					appMatched = true
+					break
 				}
 			}
 		}
-		if serviceDetail.AccessControl.OpenAuth == 1 && !appMatched {
-			middleware.ResponseError(c, 1002, errors.New("HttpJwtAuthTokenMiddleware token error"))
+		if serviceDetail.AccessControl.OpenAuth==1 && !appMatched{
+			middleware.ResponseError(c, 2003, errors.New("not match valid app"))
 			c.Abort()
 			return
 		}

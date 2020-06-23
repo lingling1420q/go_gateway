@@ -27,7 +27,7 @@ var doc = `{
     "paths": {
         "/admin/admin_info": {
             "get": {
-                "description": "登陆信息",
+                "description": "管理员信息",
                 "consumes": [
                     "application/json"
                 ],
@@ -37,7 +37,7 @@ var doc = `{
                 "tags": [
                     "管理员接口"
                 ],
-                "summary": "登陆信息",
+                "summary": "管理员信息",
                 "operationId": "/admin/admin_info",
                 "responses": {
                     "200": {
@@ -82,7 +82,7 @@ var doc = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/dto.AdminChangePwdInput"
+                            "$ref": "#/definitions/dto.ChangePwdInput"
                         }
                     }
                 ],
@@ -110,7 +110,7 @@ var doc = `{
         },
         "/admin_login/login": {
             "post": {
-                "description": "登陆接口",
+                "description": "管理员登陆",
                 "consumes": [
                     "application/json"
                 ],
@@ -120,7 +120,7 @@ var doc = `{
                 "tags": [
                     "管理员接口"
                 ],
-                "summary": "登陆接口",
+                "summary": "管理员登陆",
                 "operationId": "/admin_login/login",
                 "parameters": [
                     {
@@ -156,8 +156,8 @@ var doc = `{
             }
         },
         "/admin_login/logout": {
-            "post": {
-                "description": "退出接口",
+            "get": {
+                "description": "管理员退出",
                 "consumes": [
                     "application/json"
                 ],
@@ -167,7 +167,7 @@ var doc = `{
                 "tags": [
                     "管理员接口"
                 ],
-                "summary": "退出接口",
+                "summary": "管理员退出",
                 "operationId": "/admin_login/logout",
                 "responses": {
                     "200": {
@@ -201,7 +201,7 @@ var doc = `{
                     "application/json"
                 ],
                 "tags": [
-                    "租户管理接口"
+                    "租户管理"
                 ],
                 "summary": "租户添加",
                 "operationId": "/app/app_add",
@@ -248,7 +248,7 @@ var doc = `{
                     "application/json"
                 ],
                 "tags": [
-                    "租户管理接口"
+                    "租户管理"
                 ],
                 "summary": "租户删除",
                 "operationId": "/app/app_delete",
@@ -293,7 +293,7 @@ var doc = `{
                     "application/json"
                 ],
                 "tags": [
-                    "租户管理接口"
+                    "租户管理"
                 ],
                 "summary": "租户详情",
                 "operationId": "/app/app_detail",
@@ -338,7 +338,7 @@ var doc = `{
                     "application/json"
                 ],
                 "tags": [
-                    "租户管理接口"
+                    "租户管理"
                 ],
                 "summary": "租户列表",
                 "operationId": "/app/app_list",
@@ -396,7 +396,7 @@ var doc = `{
                     "application/json"
                 ],
                 "tags": [
-                    "租户管理接口"
+                    "租户管理"
                 ],
                 "summary": "租户统计",
                 "operationId": "/app/app_stat",
@@ -441,7 +441,7 @@ var doc = `{
                     "application/json"
                 ],
                 "tags": [
-                    "租户管理接口"
+                    "租户管理"
                 ],
                 "summary": "租户更新",
                 "operationId": "/app/app_update",
@@ -478,9 +478,20 @@ var doc = `{
                 }
             }
         },
-        "/dashboard/flow_stat": {
-            "get": {
-                "description": "流量统计",
+        "/app/tokens": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    },
+                    {
+                        "OAuth2Application": [
+                            "write",
+                            "admin"
+                        ]
+                    }
+                ],
+                "description": "租户详情",
                 "consumes": [
                     "application/json"
                 ],
@@ -488,9 +499,54 @@ var doc = `{
                     "application/json"
                 ],
                 "tags": [
-                    "系统大盘"
+                    "租户管理"
                 ],
-                "summary": "流量统计",
+                "summary": "租户详情",
+                "operationId": "/app/app_detail",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "租户ID",
+                        "name": "id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "success",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/middleware.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/dashboard/flow_stat": {
+            "get": {
+                "description": "服务统计",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "首页大盘"
+                ],
+                "summary": "服务统计",
                 "operationId": "/dashboard/flow_stat",
                 "responses": {
                     "200": {
@@ -504,7 +560,7 @@ var doc = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/dto.StatisticsOutput"
+                                            "$ref": "#/definitions/dto.ServiceStatOutput"
                                         }
                                     }
                                 }
@@ -516,7 +572,7 @@ var doc = `{
         },
         "/dashboard/panel_group_data": {
             "get": {
-                "description": "面板组数据指标",
+                "description": "指标统计",
                 "consumes": [
                     "application/json"
                 ],
@@ -524,9 +580,9 @@ var doc = `{
                     "application/json"
                 ],
                 "tags": [
-                    "系统大盘"
+                    "首页大盘"
                 ],
-                "summary": "面板组数据指标",
+                "summary": "指标统计",
                 "operationId": "/dashboard/panel_group_data",
                 "responses": {
                     "200": {
@@ -552,7 +608,7 @@ var doc = `{
         },
         "/dashboard/service_stat": {
             "get": {
-                "description": "服务统计饼状图",
+                "description": "服务统计",
                 "consumes": [
                     "application/json"
                 ],
@@ -560,9 +616,9 @@ var doc = `{
                     "application/json"
                 ],
                 "tags": [
-                    "系统大盘"
+                    "首页大盘"
                 ],
-                "summary": "服务统计饼状图",
+                "summary": "服务统计",
                 "operationId": "/dashboard/service_stat",
                 "responses": {
                     "200": {
@@ -576,7 +632,7 @@ var doc = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/dto.ServiceStatOutput"
+                                            "$ref": "#/definitions/dto.DashServiceStatOutput"
                                         }
                                     }
                                 }
@@ -596,7 +652,7 @@ var doc = `{
                     "application/json"
                 ],
                 "tags": [
-                    "服务管理接口"
+                    "服务管理"
                 ],
                 "summary": "grpc服务添加",
                 "operationId": "/service/service_add_grpc",
@@ -635,7 +691,7 @@ var doc = `{
         },
         "/service/service_add_http": {
             "post": {
-                "description": "http服务添加",
+                "description": "添加HTTP服务",
                 "consumes": [
                     "application/json"
                 ],
@@ -643,9 +699,9 @@ var doc = `{
                     "application/json"
                 ],
                 "tags": [
-                    "服务管理接口"
+                    "服务管理"
                 ],
-                "summary": "http服务添加",
+                "summary": "添加HTTP服务",
                 "operationId": "/service/service_add_http",
                 "parameters": [
                     {
@@ -654,7 +710,7 @@ var doc = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/dto.ServiceAddHttpInput"
+                            "$ref": "#/definitions/dto.ServiceAddHTTPInput"
                         }
                     }
                 ],
@@ -690,7 +746,7 @@ var doc = `{
                     "application/json"
                 ],
                 "tags": [
-                    "服务管理接口"
+                    "服务管理"
                 ],
                 "summary": "tcp服务添加",
                 "operationId": "/service/service_add_tcp",
@@ -737,7 +793,7 @@ var doc = `{
                     "application/json"
                 ],
                 "tags": [
-                    "服务管理接口"
+                    "服务管理"
                 ],
                 "summary": "服务删除",
                 "operationId": "/service/service_delete",
@@ -782,7 +838,7 @@ var doc = `{
                     "application/json"
                 ],
                 "tags": [
-                    "服务管理接口"
+                    "服务管理"
                 ],
                 "summary": "服务详情",
                 "operationId": "/service/service_detail",
@@ -827,7 +883,7 @@ var doc = `{
                     "application/json"
                 ],
                 "tags": [
-                    "服务管理接口"
+                    "服务管理"
                 ],
                 "summary": "服务列表",
                 "operationId": "/service/service_list",
@@ -839,15 +895,15 @@ var doc = `{
                         "in": "query"
                     },
                     {
-                        "type": "string",
-                        "description": "每页多少条",
+                        "type": "integer",
+                        "description": "每页个数",
                         "name": "page_size",
                         "in": "query",
                         "required": true
                     },
                     {
-                        "type": "string",
-                        "description": "页码",
+                        "type": "integer",
+                        "description": "当前页数",
                         "name": "page_no",
                         "in": "query",
                         "required": true
@@ -865,7 +921,7 @@ var doc = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/dto.PanelGroupDataOutput"
+                                            "$ref": "#/definitions/dto.ServiceListOutput"
                                         }
                                     }
                                 }
@@ -885,7 +941,7 @@ var doc = `{
                     "application/json"
                 ],
                 "tags": [
-                    "服务管理接口"
+                    "服务管理"
                 ],
                 "summary": "服务统计",
                 "operationId": "/service/service_stat",
@@ -910,7 +966,7 @@ var doc = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/dao.ServiceDetail"
+                                            "$ref": "#/definitions/dto.ServiceStatOutput"
                                         }
                                     }
                                 }
@@ -930,7 +986,7 @@ var doc = `{
                     "application/json"
                 ],
                 "tags": [
-                    "服务管理接口"
+                    "服务管理"
                 ],
                 "summary": "grpc服务更新",
                 "operationId": "/service/service_update_grpc",
@@ -969,7 +1025,7 @@ var doc = `{
         },
         "/service/service_update_http": {
             "post": {
-                "description": "http服务更新",
+                "description": "修改HTTP服务",
                 "consumes": [
                     "application/json"
                 ],
@@ -977,9 +1033,9 @@ var doc = `{
                     "application/json"
                 ],
                 "tags": [
-                    "服务管理接口"
+                    "服务管理"
                 ],
-                "summary": "http服务更新",
+                "summary": "修改HTTP服务",
                 "operationId": "/service/service_update_http",
                 "parameters": [
                     {
@@ -988,7 +1044,7 @@ var doc = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/dto.ServiceUpdateHttpInput"
+                            "$ref": "#/definitions/dto.ServiceUpdateHTTPInput"
                         }
                     }
                 ],
@@ -1024,7 +1080,7 @@ var doc = `{
                     "application/json"
                 ],
                 "tags": [
-                    "服务管理接口"
+                    "服务管理"
                 ],
                 "summary": "tcp服务更新",
                 "operationId": "/service/service_update_tcp",
@@ -1222,9 +1278,6 @@ var doc = `{
         },
         "dao.ServiceDetail": {
             "type": "object",
-            "required": [
-                "info"
-            ],
             "properties": {
                 "access_control": {
                     "type": "object",
@@ -1405,17 +1458,6 @@ var doc = `{
                 }
             }
         },
-        "dto.AdminChangePwdInput": {
-            "type": "object",
-            "required": [
-                "password"
-            ],
-            "properties": {
-                "password": {
-                    "type": "string"
-                }
-            }
-        },
         "dto.AdminInfoOutput": {
             "type": "object",
             "properties": {
@@ -1450,32 +1492,73 @@ var doc = `{
             ],
             "properties": {
                 "password": {
-                    "type": "string"
+                    "description": "密码",
+                    "type": "string",
+                    "example": "123456"
                 },
                 "username": {
-                    "type": "string"
+                    "description": "管理员用户名",
+                    "type": "string",
+                    "example": "admin"
                 }
             }
         },
         "dto.AdminLoginOutput": {
             "type": "object",
-            "required": [
-                "token"
-            ],
             "properties": {
                 "token": {
+                    "description": "token",
+                    "type": "string",
+                    "example": "token"
+                }
+            }
+        },
+        "dto.ChangePwdInput": {
+            "type": "object",
+            "required": [
+                "password"
+            ],
+            "properties": {
+                "password": {
+                    "description": "密码",
+                    "type": "string",
+                    "example": "123456"
+                }
+            }
+        },
+        "dto.DashServiceStatItemOutput": {
+            "type": "object",
+            "properties": {
+                "load_type": {
+                    "type": "integer"
+                },
+                "name": {
                     "type": "string"
+                },
+                "value": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.DashServiceStatOutput": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.DashServiceStatItemOutput"
+                    }
+                },
+                "legend": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 }
             }
         },
         "dto.PanelGroupDataOutput": {
             "type": "object",
-            "required": [
-                "appNum",
-                "currentQps",
-                "serviceNum",
-                "todayRequestNum"
-            ],
             "properties": {
                 "appNum": {
                     "type": "integer"
@@ -1545,7 +1628,7 @@ var doc = `{
                 }
             }
         },
-        "dto.ServiceAddHttpInput": {
+        "dto.ServiceAddHTTPInput": {
             "type": "object",
             "required": [
                 "ip_list",
@@ -1556,72 +1639,87 @@ var doc = `{
             ],
             "properties": {
                 "black_list": {
+                    "description": "黑名单ip",
                     "type": "string"
                 },
                 "clientip_flow_limit": {
+                    "description": "\u0008客户端ip限流",
                     "type": "integer"
                 },
-                "forbid_list": {
-                    "type": "string"
-                },
                 "header_transfor": {
+                    "description": "header转换",
                     "type": "string"
                 },
                 "ip_list": {
+                    "description": "ip列表",
                     "type": "string"
                 },
                 "need_https": {
+                    "description": "支持https",
                     "type": "integer"
                 },
                 "need_strip_uri": {
+                    "description": "启用strip_uri",
                     "type": "integer"
                 },
                 "need_websocket": {
+                    "description": "是否支持websocket",
                     "type": "integer"
                 },
                 "open_auth": {
+                    "description": "关键词",
                     "type": "integer"
                 },
                 "round_type": {
+                    "description": "轮询方式",
                     "type": "integer"
                 },
                 "rule": {
+                    "description": "域名或者前缀",
                     "type": "string"
                 },
                 "rule_type": {
+                    "description": "接入类型",
                     "type": "integer"
                 },
                 "service_desc": {
+                    "description": "服务描述",
                     "type": "string"
                 },
                 "service_flow_limit": {
+                    "description": "服务端限流",
                     "type": "integer"
                 },
                 "service_name": {
+                    "description": "服务名",
                     "type": "string"
                 },
                 "upstream_connect_timeout": {
+                    "description": "建立连接超时, 单位s",
                     "type": "integer"
                 },
                 "upstream_header_timeout": {
+                    "description": "获取header超时, 单位s",
                     "type": "integer"
                 },
                 "upstream_idle_timeout": {
+                    "description": "链接最大空闲时间, 单位s",
                     "type": "integer"
                 },
                 "upstream_max_idle": {
+                    "description": "最大空闲链接数",
                     "type": "integer"
                 },
                 "url_rewrite": {
+                    "description": "url重写功能",
                     "type": "string"
                 },
                 "weight_list": {
-                    "type": "string"
-                },
-                "white_host_name": {
+                    "description": "\u0008权重列表",
                     "type": "string"
                 },
                 "white_list": {
+                    "description": "白名单ip",
                     "type": "string"
                 }
             }
@@ -1680,13 +1778,55 @@ var doc = `{
                 }
             }
         },
-        "dto.ServiceStatItemOutput": {
+        "dto.ServiceListItemOutput": {
             "type": "object",
             "properties": {
-                "name": {
+                "id": {
+                    "description": "id",
+                    "type": "integer"
+                },
+                "load_type": {
+                    "description": "类型",
+                    "type": "integer"
+                },
+                "qpd": {
+                    "description": "qpd",
+                    "type": "integer"
+                },
+                "qps": {
+                    "description": "qps",
+                    "type": "integer"
+                },
+                "service_addr": {
+                    "description": "服务地址",
                     "type": "string"
                 },
-                "value": {
+                "service_desc": {
+                    "description": "服务描述",
+                    "type": "string"
+                },
+                "service_name": {
+                    "description": "服务名称",
+                    "type": "string"
+                },
+                "total_node": {
+                    "description": "节点数",
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.ServiceListOutput": {
+            "type": "object",
+            "properties": {
+                "list": {
+                    "description": "列表",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.ServiceListItemOutput"
+                    }
+                },
+                "total": {
+                    "description": "总数",
                     "type": "integer"
                 }
             }
@@ -1694,16 +1834,18 @@ var doc = `{
         "dto.ServiceStatOutput": {
             "type": "object",
             "properties": {
-                "data": {
+                "today": {
+                    "description": "列表",
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/dto.ServiceStatItemOutput"
+                        "type": "integer"
                     }
                 },
-                "legend": {
+                "yesterday": {
+                    "description": "列表",
                     "type": "array",
                     "items": {
-                        "type": "string"
+                        "type": "integer"
                     }
                 }
             }
@@ -1766,7 +1908,7 @@ var doc = `{
                 }
             }
         },
-        "dto.ServiceUpdateHttpInput": {
+        "dto.ServiceUpdateHTTPInput": {
             "type": "object",
             "required": [
                 "id",
@@ -1778,75 +1920,97 @@ var doc = `{
             ],
             "properties": {
                 "black_list": {
+                    "description": "黑名单ip",
                     "type": "string"
                 },
                 "clientip_flow_limit": {
+                    "description": "\u0008客户端ip限流",
                     "type": "integer"
                 },
-                "forbid_list": {
-                    "type": "string"
-                },
                 "header_transfor": {
+                    "description": "header转换",
                     "type": "string"
                 },
                 "id": {
-                    "type": "integer"
+                    "description": "服务ID",
+                    "type": "integer",
+                    "example": 62
                 },
                 "ip_list": {
-                    "type": "string"
+                    "description": "ip列表",
+                    "type": "string",
+                    "example": "127.0.0.1:80"
                 },
                 "need_https": {
+                    "description": "支持https",
                     "type": "integer"
                 },
                 "need_strip_uri": {
+                    "description": "启用strip_uri",
                     "type": "integer"
                 },
                 "need_websocket": {
+                    "description": "是否支持websocket",
                     "type": "integer"
                 },
                 "open_auth": {
+                    "description": "关键词",
                     "type": "integer"
                 },
                 "round_type": {
+                    "description": "轮询方式",
                     "type": "integer"
                 },
                 "rule": {
-                    "type": "string"
+                    "description": "域名或者前缀",
+                    "type": "string",
+                    "example": "/test_http_service_indb"
                 },
                 "rule_type": {
+                    "description": "接入类型",
                     "type": "integer"
                 },
                 "service_desc": {
-                    "type": "string"
+                    "description": "服务描述",
+                    "type": "string",
+                    "example": "test_http_service_indb"
                 },
                 "service_flow_limit": {
+                    "description": "服务端限流",
                     "type": "integer"
                 },
                 "service_name": {
-                    "type": "string"
+                    "description": "服务名",
+                    "type": "string",
+                    "example": "test_http_service_indb"
                 },
                 "upstream_connect_timeout": {
+                    "description": "建立连接超时, 单位s",
                     "type": "integer"
                 },
                 "upstream_header_timeout": {
+                    "description": "获取header超时, 单位s",
                     "type": "integer"
                 },
                 "upstream_idle_timeout": {
+                    "description": "链接最大空闲时间, 单位s",
                     "type": "integer"
                 },
                 "upstream_max_idle": {
+                    "description": "最大空闲链接数",
                     "type": "integer"
                 },
                 "url_rewrite": {
+                    "description": "url重写功能",
                     "type": "string"
                 },
                 "weight_list": {
-                    "type": "string"
-                },
-                "white_host_name": {
-                    "type": "string"
+                    "description": "\u0008权重列表",
+                    "type": "string",
+                    "example": "50"
                 },
                 "white_list": {
+                    "description": "白名单ip",
                     "type": "string"
                 }
             }

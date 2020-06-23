@@ -3,45 +3,41 @@ package http_proxy_middleware
 import (
 	"github.com/e421083458/go_gateway/dao"
 	"github.com/e421083458/go_gateway/middleware"
-	"github.com/e421083458/go_gateway/public"
 	"github.com/e421083458/go_gateway/reverse_proxy"
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
-	"time"
 )
 
-func HttpReverseProxyMiddleware() gin.HandlerFunc {
+//匹配接入方式 基于请求信息
+func HTTPReverseProxyMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		tmp, ok := c.Get("service_detail")
+		serverInterface, ok := c.Get("service")
 		if !ok {
-			middleware.ResponseError(c, 1001, errors.New("HttpReverseProxyMiddleware get service_detail error"))
+			middleware.ResponseError(c, 2001, errors.New("service not found"))
 			c.Abort()
 			return
 		}
-		serviceDetail := tmp.(*dao.ServiceDetail)
+		serviceDetail := serverInterface.(*dao.ServiceDetail)
 
-		//设置负载均衡策略
-		lb, err := serviceDetail.GetHttpLoadBalancer()
+		lb, err := dao.LoadBalancerHandler.GetLoadBalancer(serviceDetail)
 		if err != nil {
-			middleware.ResponseError(c, 1002, errors.WithMessage(err, "GetHttpLoadBalancer"))
+			middleware.ResponseError(c, 2002, err)
 			c.Abort()
 			return
 		}
-
-		//设置连接池
-		transParam := &public.TransParam{
-			Timeout:               time.Second * time.Duration(serviceDetail.LoadBalance.UpstreamConnectTimeout),
-			ResponseHeaderTimeout: time.Second * time.Duration(serviceDetail.LoadBalance.UpstreamConnectTimeout),
-			IdleConnTimeout:       time.Second * time.Duration(serviceDetail.LoadBalance.UpstreamConnectTimeout),
-			MaxIdleConns:          serviceDetail.LoadBalance.UpstreamMaxIdle,
-		}
-		trans, err := public.TransporterHandler.GetTrans(serviceDetail.Info.ServiceName, transParam)
+		trans, err := dao.TransportorHandler.GetTrans(serviceDetail)
 		if err != nil {
-			middleware.ResponseError(c, 1003, errors.WithMessage(err, "GetTrans"))
+			middleware.ResponseError(c, 2003, err)
 			c.Abort()
 			return
 		}
+		//middleware.ResponseSuccess(c,"ok")
+		//return
+		//创建 reverseproxy
+		//使用 reverseproxy.ServerHTTP(c.Request,c.Response)
 		proxy := reverse_proxy.NewLoadBalanceReverseProxy(c, lb, trans)
 		proxy.ServeHTTP(c.Writer, c.Request)
+		c.Abort()
+		return
 	}
 }

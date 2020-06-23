@@ -2,52 +2,57 @@ package controller
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/e421083458/go_gateway/dao"
 	"github.com/e421083458/go_gateway/dto"
 	"github.com/e421083458/go_gateway/middleware"
 	"github.com/e421083458/go_gateway/public"
-	"github.com/e421083458/golang_common/lib"
-	"github.com/gin-contrib/sessions"
+	"github.com/e421083458/go_gateway/golang_common/lib"
+	"github.com/gin-gonic/contrib/sessions"
 	"github.com/gin-gonic/gin"
 )
 
-//AdminRegister admin路由注册
-func AdminRegister(router *gin.RouterGroup) {
-	admin := AdminController{}
-	router.GET("/admin_info", admin.AdminInfo)
-	router.POST("/change_pwd", admin.ChangePwd)
+type AdminController struct{}
+
+func AdminRegister(group *gin.RouterGroup) {
+	adminLogin := &AdminController{}
+	group.GET("/admin_info", adminLogin.AdminInfo)
+	group.POST("/change_pwd", adminLogin.ChangePwd)
 }
 
-type AdminController struct {
-}
-
-// ListPage godoc
-// @Summary 登陆信息
-// @Description 登陆信息
+// AdminInfo godoc
+// @Summary 管理员信息
+// @Description 管理员信息
 // @Tags 管理员接口
 // @ID /admin/admin_info
 // @Accept  json
 // @Produce  json
 // @Success 200 {object} middleware.Response{data=dto.AdminInfoOutput} "success"
 // @Router /admin/admin_info [get]
-func (admin *AdminController) AdminInfo(c *gin.Context) {
-	session := sessions.Default(c)
-	adminInfoStr := session.Get(public.AdminInfoSessionKey)
-	sessionInfo := &dto.AdminSession{}
-	if err := json.Unmarshal([]byte(adminInfoStr.(string)), sessionInfo); err != nil {
-		middleware.ResponseError(c, 200, err)
+func (adminlogin *AdminController) AdminInfo(c *gin.Context) {
+	sess := sessions.Default(c)
+	sessInfo := sess.Get(public.AdminSessionInfoKey)
+	adminSessionInfo := &dto.AdminSessionInfo{}
+	if err := json.Unmarshal([]byte(fmt.Sprint(sessInfo)), adminSessionInfo); err != nil {
+		middleware.ResponseError(c, 2000, err)
 		return
 	}
-	output := &dto.AdminInfoOutput{
-		ID:           sessionInfo.ID,
-		Name:         sessionInfo.UserName,
+
+	//1. 读取sessionKey对应json 转换为结构体
+	//2. 取出数据然后封装输出结构体
+
+	//Avatar       string    `json:"avatar"`
+	//Introduction string    `json:"introduction"`
+	//Roles        []string  `json:"roles"`
+	out := &dto.AdminInfoOutput{
+		ID:           adminSessionInfo.ID,
+		Name:         adminSessionInfo.UserName,
+		LoginTime:    adminSessionInfo.LoginTime,
 		Avatar:       "https://wpimg.wallstcn.com/f778738c-e4f8-4870-b634-56703b4acafe.gif",
 		Introduction: "I am a super administrator",
 		Roles:        []string{"admin"},
-		LoginTime:    sessionInfo.LoginTime,
 	}
-	middleware.ResponseSuccess(c, output)
-	return
+	middleware.ResponseSuccess(c, out)
 }
 
 // ChangePwd godoc
@@ -57,39 +62,51 @@ func (admin *AdminController) AdminInfo(c *gin.Context) {
 // @ID /admin/change_pwd
 // @Accept  json
 // @Produce  json
-// @Param body body dto.AdminChangePwdInput true "body"
+// @Param body body dto.ChangePwdInput true "body"
 // @Success 200 {object} middleware.Response{data=string} "success"
 // @Router /admin/change_pwd [post]
-func (admin *AdminController) ChangePwd(c *gin.Context) {
-	params := &dto.AdminChangePwdInput{}
-	if err := params.GetValidParams(c); err != nil {
-		middleware.ResponseError(c, 2001, err)
+func (adminlogin *AdminController) ChangePwd(c *gin.Context) {
+	params := &dto.ChangePwdInput{}
+	if err := params.BindValidParam(c); err != nil {
+		middleware.ResponseError(c, 2000, err)
 		return
 	}
 
-	session := sessions.Default(c)
-	adminInfoStr := session.Get(public.AdminInfoSessionKey)
-	sessionInfo := &dto.AdminSession{}
-	if err := json.Unmarshal([]byte(adminInfoStr.(string)), sessionInfo); err != nil {
+	//1. session读取用户信息到结构体 sessInfo
+	//2. sessInfo.ID 读取数据库信息 adminInfo
+	//3. params.password+adminInfo.salt sha256 saltPassword
+	//4. saltPassword==> adminInfo.password 执行数据保存
+
+	//session读取用户信息到结构体
+	sess := sessions.Default(c)
+	sessInfo := sess.Get(public.AdminSessionInfoKey)
+	adminSessionInfo := &dto.AdminSessionInfo{}
+	if err := json.Unmarshal([]byte(fmt.Sprint(sessInfo)), adminSessionInfo); err != nil {
+		middleware.ResponseError(c, 2000, err)
+		return
+	}
+
+	//从数据库中读取 adminInfo
+	tx, err := lib.GetGormPool("default")
+	if err != nil {
+		middleware.ResponseError(c, 2001, err)
+		return
+	}
+	adminInfo := &dao.Admin{}
+	adminInfo, err = adminInfo.Find(c, tx, (&dao.Admin{UserName: adminSessionInfo.UserName}))
+	if err != nil {
 		middleware.ResponseError(c, 2002, err)
 		return
 	}
 
-	search := &dao.GatewayAdmin{
-		ID: sessionInfo.ID,
-	}
-	adminInfo, err := search.Find(c, lib.GORMDefaultPool, search)
-	if err != nil {
+	//生成新密码 saltPassword
+	saltPassword := public.GenSaltPassword(adminInfo.Salt, params.Password)
+	adminInfo.Password = saltPassword
+
+	//执行数据保存
+	if err := adminInfo.Save(c, tx); err != nil {
 		middleware.ResponseError(c, 2003, err)
 		return
 	}
-
-	savePassword := public.GenSaltPassword(params.Password, adminInfo.Salt)
-	adminInfo.Password = savePassword
-	if err := adminInfo.Save(c, lib.GORMDefaultPool); err != nil {
-		middleware.ResponseError(c, 2004, err)
-		return
-	}
 	middleware.ResponseSuccess(c, "")
-	return
 }

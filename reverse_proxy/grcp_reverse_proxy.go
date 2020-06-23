@@ -2,9 +2,10 @@ package reverse_proxy
 
 import (
 	"context"
-	"github.com/e421083458/go_gateway/load_balance"
+	"github.com/e421083458/go_gateway/reverse_proxy/load_balance"
 	"github.com/e421083458/grpc-proxy/proxy"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 	"log"
 )
 
@@ -16,7 +17,10 @@ func NewGrpcLoadBalanceHandler(lb load_balance.LoadBalance) grpc.StreamHandler {
 		}
 		director := func(ctx context.Context, fullMethodName string) (context.Context, *grpc.ClientConn, error) {
 			c, err := grpc.DialContext(ctx, nextAddr, grpc.WithCodec(proxy.Codec()), grpc.WithInsecure())
-			return ctx, c, err
+			md, _ := metadata.FromIncomingContext(ctx)
+			outCtx, _ := context.WithCancel(ctx)
+			outCtx = metadata.NewOutgoingContext(outCtx, md.Copy())
+			return outCtx, c, err
 		}
 		return proxy.TransparentHandler(director)
 	}()

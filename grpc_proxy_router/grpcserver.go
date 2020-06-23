@@ -11,54 +11,58 @@ import (
 	"net"
 )
 
-var (
-	grpcServerList []*grpc.Server
-)
+var grpcServerList = []*warpGrpcServer{}
+
+type warpGrpcServer struct {
+	Addr string
+	*grpc.Server
+}
 
 func GrpcServerRun() {
-	serviceList := dao.ServiceHandler.GetGrpcServiceList()
-	fmt.Println("grpc server list", serviceList)
-	for _, service := range serviceList {
-		go func(service *dao.ServiceDetail) {
-			addr := fmt.Sprint(service.GrpcRule.Port)
-			rb, err := service.GetTcpLoadBalancer()
+	serviceList := dao.ServiceManagerHandler.GetGrpcServiceList()
+	for _, serviceItem := range serviceList {
+		tempItem := serviceItem
+		go func(serviceDetail *dao.ServiceDetail) {
+			addr := fmt.Sprintf(":%d", serviceDetail.GRPCRule.Port)
+			rb, err := dao.LoadBalancerHandler.GetLoadBalancer(serviceDetail)
 			if err != nil {
-				fmt.Errorf("GetGrpcLoadBalancer err:%v", err)
+				log.Fatalf(" [INFO] GetTcpLoadBalancer %v err:%v\n", addr, err)
 				return
 			}
-
-			lis, err := net.Listen("tcp", ":"+addr)
+			lis, err := net.Listen("tcp", addr)
 			if err != nil {
-				log.Fatalf("failed to listen: %v", err)
+				log.Fatalf(" [INFO] GrpcListen %v err:%v\n", addr, err)
 			}
-
 			grpcHandler := reverse_proxy.NewGrpcLoadBalanceHandler(rb)
 			s := grpc.NewServer(
 				grpc.ChainStreamInterceptor(
-					grpc_proxy_middleware.GrpcJwtAuthTokenMiddleware(service),
-					grpc_proxy_middleware.GrpcJwtClientFlowLimitMiddleware(service),
-					grpc_proxy_middleware.GrpcJwtServerFlowCountMiddleware(service),
-					grpc_proxy_middleware.GrpcServerFlowCountMiddleware(service),
-					grpc_proxy_middleware.GrpcClientFlowLimitMiddleware(service),
-					grpc_proxy_middleware.GrpcServerFlowLimitMiddleware(service),
-					grpc_proxy_middleware.GrpcMetaTransferMiddleware(service),
-					grpc_proxy_middleware.GrpcWhiteIplistMiddleware(service),
-					grpc_proxy_middleware.GrpcBlackIplistMiddleware(service), ),
+					grpc_proxy_middleware.GrpcFlowCountMiddleware(serviceDetail),
+					grpc_proxy_middleware.GrpcFlowLimitMiddleware(serviceDetail),
+					grpc_proxy_middleware.GrpcJwtAuthTokenMiddleware(serviceDetail),
+					grpc_proxy_middleware.GrpcJwtFlowCountMiddleware(serviceDetail),
+					grpc_proxy_middleware.GrpcJwtFlowLimitMiddleware(serviceDetail),
+					grpc_proxy_middleware.GrpcWhiteListMiddleware(serviceDetail),
+					grpc_proxy_middleware.GrpcBlackListMiddleware(serviceDetail),
+					grpc_proxy_middleware.GrpcHeaderTransferMiddleware(serviceDetail),
+				),
 				grpc.CustomCodec(proxy.Codec()),
-				grpc.UnknownServiceHandler(grpcHandler)) //自定义全局回调
+				grpc.UnknownServiceHandler(grpcHandler))
 
-			grpcServerList = append(grpcServerList, s)
-			log.Printf(" [INFO] grpc_proxy_run %s\n", ":"+addr)
+			grpcServerList = append(grpcServerList, &warpGrpcServer{
+				Addr:   addr,
+				Server: s,
+			})
+			log.Printf(" [INFO] grpc_proxy_run %v\n", addr)
 			if err := s.Serve(lis); err != nil {
-				log.Fatalf(" [ERROR] grpc_proxy_run %s err:%v\n", ":"+addr, err)
+				log.Fatalf(" [INFO] grpc_proxy_run %v err:%v\n", addr, err)
 			}
-		}(service)
+		}(tempItem)
 	}
 }
 
 func GrpcServerStop() {
 	for _, grpcServer := range grpcServerList {
 		grpcServer.GracefulStop()
-		log.Printf(" [INFO] grpc_proxy_stop stopped\n")
+		log.Printf(" [INFO] grpc_proxy_stop %v stopped\n", grpcServer.Addr)
 	}
 }

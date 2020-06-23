@@ -3,17 +3,23 @@ package main
 import (
 	"flag"
 	"github.com/e421083458/go_gateway/dao"
+	"github.com/e421083458/go_gateway/golang_common/lib"
 	"github.com/e421083458/go_gateway/grpc_proxy_router"
 	"github.com/e421083458/go_gateway/http_proxy_router"
 	"github.com/e421083458/go_gateway/router"
 	"github.com/e421083458/go_gateway/tcp_proxy_router"
-	"github.com/e421083458/golang_common/lib"
 	"os"
 	"os/signal"
 	"syscall"
 )
 
-var endpoint = flag.String("endpoint", "", "dashboard or server")
+//endpoint dashboard后台管理  server代理服务器
+//config ./conf/prod/ 对应配置文件夹
+
+var (
+	endpoint = flag.String("endpoint", "", "input endpoint dashboard or server")
+	config   = flag.String("config", "", "input config file like ./conf/dev/")
+)
 
 func main() {
 	flag.Parse()
@@ -21,28 +27,32 @@ func main() {
 		flag.Usage()
 		os.Exit(1)
 	}
+	if *config == "" {
+		flag.Usage()
+		os.Exit(1)
+	}
 
 	if *endpoint == "dashboard" {
-		lib.InitModule("./conf/dev/", []string{"base", "mysql", "redis",})
+		lib.InitModule(*config)
 		defer lib.Destroy()
 		router.HttpServerRun()
 
 		quit := make(chan os.Signal)
-		signal.Notify(quit, syscall.SIGKILL, syscall.SIGQUIT, syscall.SIGINT, syscall.SIGTERM)
+		signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 		<-quit
+
 		router.HttpServerStop()
-	}
-	if *endpoint == "server" {
-		lib.InitModule("./conf/dev/", []string{"base", "mysql", "redis",})
+	} else {
+		lib.InitModule(*config)
 		defer lib.Destroy()
-		dao.ServiceHandler.LoadOnce()
-		dao.AppHandler.LoadOnce()
+		dao.ServiceManagerHandler.LoadOnce()
+		dao.AppManagerHandler.LoadOnce()
 
 		go func() {
 			http_proxy_router.HttpServerRun()
 		}()
 		go func() {
-			http_proxy_router.HttpSSLServerRun()
+			http_proxy_router.HttpsServerRun()
 		}()
 		go func() {
 			tcp_proxy_router.TcpServerRun()
@@ -52,12 +62,12 @@ func main() {
 		}()
 
 		quit := make(chan os.Signal)
-		signal.Notify(quit, syscall.SIGKILL, syscall.SIGQUIT, syscall.SIGINT, syscall.SIGTERM)
+		signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 		<-quit
 
-		http_proxy_router.HttpServerStop()
-		http_proxy_router.HttpSSLServerStop()
 		tcp_proxy_router.TcpServerStop()
 		grpc_proxy_router.GrpcServerStop()
+		http_proxy_router.HttpServerStop()
+		http_proxy_router.HttpsServerStop()
 	}
 }

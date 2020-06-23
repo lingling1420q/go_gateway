@@ -191,11 +191,11 @@ CREATE TABLE `gateway_service_info` (
   `id` bigint(20) UNSIGNED NOT NULL COMMENT '自增主键',
   `load_type` tinyint(4) NOT NULL DEFAULT '0' COMMENT '负载类型 0=http 1=tcp 2=grpc',
   `service_name` varchar(255) NOT NULL DEFAULT '' COMMENT '服务名称 6-128 数字字母下划线',
-  `service_desc` varchar(255) NOT NULL DEFAULT '' COMMENT '服务名称',
+  `service_desc` varchar(255) NOT NULL DEFAULT '' COMMENT '服务描述',
   `create_at` datetime NOT NULL DEFAULT '1971-01-01 00:00:00' COMMENT '添加时间',
   `update_at` datetime NOT NULL DEFAULT '1971-01-01 00:00:00' COMMENT '更新时间',
   `is_delete` tinyint(4) DEFAULT '0' COMMENT '是否删除 1=删除'
-) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='网关模块表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='网关基本信息表';
 
 --
 -- 转存表中的数据 `gateway_service_info`
